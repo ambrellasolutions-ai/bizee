@@ -45,9 +45,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ניהול פיננסי</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/firebase@9.23.0/compat/app/dist/index.browser.js"></script>
-<script src="https://unpkg.com/firebase@9.23.0/compat/auth/dist/index.browser.js"></script>
-<script src="https://unpkg.com/firebase@9.23.0/compat/firestore/dist/index.browser.js"></script>
 <style>
   :root {
     --bg: #0d0f14;
@@ -267,21 +264,6 @@
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
-<div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:24px">
-  <div style="text-align:center">
-    <div style="font-size:40px;margin-bottom:12px">💼</div>
-    <div style="font-size:22px;font-weight:800;color:var(--accent)">ניהול פיננסי</div>
-    <div style="font-size:13px;color:var(--text3);margin-top:6px">Ambrella</div>
-  </div>
-  <button onclick="signInWithGoogle()" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 28px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:15px;font-weight:600;color:var(--text);transition:all 0.2s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
-    <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
-    כניסה עם Google
-  </button>
-  <div id="login-error" style="font-size:13px;color:var(--red);display:none"></div>
-  <div id="login-loading" style="font-size:13px;color:var(--text3);display:none">מתחבר...</div>
-</div>
-
 <nav class="topbar" style="display:none">
   <div class="logo">💼 פיננסי</div>
   <div class="nav-item active" onclick="goTo('dashboard')">📊 סקירה</div>
@@ -391,11 +373,8 @@
 
   <!-- FOOTER -->
   <div class="panel-footer">
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <div style="font-size:11px;color:var(--text3)">גרסה 0.9 · מרץ 2026</div>
-      <div style="font-size:11px;color:var(--text3)" id="panel-user-email"></div>
-    </div>
-    <button onclick="signOut()" style="font-size:11.5px;color:var(--red);background:none;border:1px solid rgba(247,96,79,0.3);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'Heebo',sans-serif" onmouseover="this.style.background='rgba(247,96,79,0.08)'" onmouseout="this.style.background='none'">יציאה</button>
+    <div style="font-size:11px;color:var(--text3)">גרסה 0.9 · מרץ 2026</div>
+    <div style="font-size:11px;color:var(--text3)">Ambrella</div>
   </div>
 </div>
 
@@ -1394,36 +1373,63 @@
 </div>
 
 <script>
-// ========== FIREBASE ==========
-const firebaseConfig = {
-  apiKey: "AIzaSyCfzAH_z64PCEU_1RDd9_1blzMUri_Jn6U",
-  authDomain: "ambrella-7ef1c.firebaseapp.com",
-  projectId: "ambrella-7ef1c",
-  storageBucket: "ambrella-7ef1c.firebasestorage.app",
-  messagingSenderId: "1084631742418",
-  appId: "1:1084631742418:web:8685cbe5aeb6ba51317a0b"
-};
-
-let auth = null, db = null, currentUser = null;
+// ========== FIRESTORE REST API ==========
+const FS_PROJECT = 'ambrella-7ef1c';
+const FS_API_KEY = 'AIzaSyCfzAH_z64PCEU_1RDd9_1blzMUri_Jn6U';
+const FS_BASE    = `https://firestore.googleapis.com/v1/projects/${FS_PROJECT}/databases/(default)/documents/bizee`;
 
 const COLLECTIONS = ['payments','expenses','clients','quotes','activities','followups','recurring','checksout'];
 const VAR_MAP = { checksout: 'checksOut' };
 function varName(col) { return VAR_MAP[col] || col; }
-function userCol(col) { return db.collection('users').doc(currentUser.uid).collection(col); }
+
+// Firestore REST helpers
+function toFS(val) {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number')  return { doubleValue: val };
+  if (typeof val === 'string')  return { stringValue: val };
+  if (Array.isArray(val))       return { arrayValue: { values: val.map(toFS) } };
+  if (typeof val === 'object')  return { mapValue: { fields: Object.fromEntries(Object.entries(val).map(([k,v]) => [k, toFS(v)])) } };
+  return { stringValue: String(val) };
+}
+
+function fromFS(val) {
+  if (!val) return null;
+  if ('nullValue'    in val) return null;
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('integerValue' in val) return Number(val.integerValue);
+  if ('doubleValue'  in val) return val.doubleValue;
+  if ('stringValue'  in val) return val.stringValue;
+  if ('arrayValue'   in val) return (val.arrayValue.values || []).map(fromFS);
+  if ('mapValue'     in val) return Object.fromEntries(Object.entries(val.mapValue.fields || {}).map(([k,v]) => [k, fromFS(v)]));
+  return null;
+}
 
 async function fbSave(col, data) {
-  if (!currentUser || !db) return;
-  try { await userCol(col).doc('data').set({ items: data, updatedAt: Date.now() }); }
-  catch(e) { console.warn('fbSave', col, e); }
+  try {
+    const url = `${FS_BASE}/${col}?key=${FS_API_KEY}&documentId=data`;
+    const body = { fields: { items: toFS(data), updatedAt: toFS(Date.now()) } };
+    // try PATCH first (update), if 404 use POST (create)
+    const patchUrl = `${FS_BASE}/${col}/data?key=${FS_API_KEY}`;
+    await fetch(patchUrl, { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  } catch(e) { console.warn('fbSave', col, e); }
 }
 
 async function fbLoadAll() {
-  if (!currentUser || !db) return false;
   try {
-    const snaps = await Promise.all(COLLECTIONS.map(col => userCol(col).doc('data').get()));
+    const results = await Promise.all(COLLECTIONS.map(async col => {
+      const url = `${FS_BASE}/${col}/data?key=${FS_API_KEY}`;
+      const res  = await fetch(url);
+      if (!res.ok) return null;
+      const doc  = await res.json();
+      return doc.fields?.items ? fromFS(doc.fields.items) : null;
+    }));
     let hasData = false;
-    snaps.forEach((snap, i) => {
-      if (snap.exists) { window[varName(COLLECTIONS[i])] = snap.data().items || []; hasData = true; }
+    results.forEach((data, i) => {
+      if (data !== null) {
+        window[varName(COLLECTIONS[i])] = data;
+        hasData = true;
+      }
     });
     return hasData;
   } catch(e) { console.warn('fbLoad', e); return false; }
@@ -1436,83 +1442,23 @@ function showSyncStatus(msg) {
   clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
 
-function signInWithGoogle() {
-  document.getElementById('login-loading').style.display = 'block';
-  document.getElementById('login-error').style.display   = 'none';
-  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
-    document.getElementById('login-loading').style.display = 'none';
-    document.getElementById('login-error').style.display   = 'block';
-    document.getElementById('login-error').textContent     = 'שגיאה: ' + err.message;
-  });
-}
-
-function signOut() { auth.signOut(); closePanel(); }
-
-async function onUserLogin(user) {
-  currentUser = user;
-  document.getElementById('login-screen').style.display = 'none';
-  document.querySelector('.topbar').style.display        = 'flex';
-  document.querySelector('.main').style.display          = 'block';
-  const emailEl = document.getElementById('panel-user-email');
-  if (emailEl) emailEl.textContent = user.displayName || user.email || '';
+// Init – load from cloud, fallback to localStorage
+async function initApp() {
+  showSyncStatus('טוען נתונים...');
   const hasCloud = await fbLoadAll();
-  if (!hasCloud) {
-    showSyncStatus('מעלה נתונים לענן...');
-    await Promise.all(COLLECTIONS.map(col => fbSave(col, window[varName(col)])));
-    showSyncStatus('✅ נתונים הועלו בהצלחה');
-  } else {
+  if (hasCloud) {
     showSyncStatus('✅ נטען מהענן');
+  } else {
+    showSyncStatus('💾 עובד מקומית');
   }
+  document.querySelector('.topbar').style.display = 'flex';
+  document.querySelector('.main').style.display   = 'block';
   populateYearFilter(); populateCfYearFilter();
   updateClientsList(); updateServicesList();
   renderDashboard();
 }
 
-function onUserLogout() {
-  currentUser = null;
-  document.getElementById('login-screen').style.display = 'flex';
-  document.querySelector('.topbar').style.display        = 'none';
-  document.querySelector('.main').style.display          = 'none';
-}
-
-// Load Firebase SDK dynamically
-window.addEventListener('load', function() {
-  function initFirebase(retries) {
-    if (typeof firebase !== 'undefined') {
-      try { firebase.initializeApp(firebaseConfig); } catch(e) {}
-      auth = firebase.auth();
-      db   = firebase.firestore();
-
-      const loginScreen = document.getElementById('login-screen');
-      loginScreen.style.display = 'flex';
-      loginScreen.innerHTML = `
-        <div style="text-align:center">
-          <div style="font-size:40px;margin-bottom:12px">💼</div>
-          <div style="font-size:22px;font-weight:800;color:var(--accent)">ניהול פיננסי</div>
-          <div style="font-size:13px;color:var(--text3);margin-top:6px">Ambrella</div>
-        </div>
-        <button onclick="signInWithGoogle()" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 28px;cursor:pointer;font-family:'Heebo',sans-serif;font-size:15px;font-weight:600;color:var(--text)">
-          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
-          כניסה עם Google
-        </button>
-        <div id="login-error" style="font-size:13px;color:var(--red);display:none"></div>
-        <div id="login-loading" style="font-size:13px;color:var(--text3);display:none">מתחבר...</div>`;
-
-      auth.onAuthStateChanged(user => user ? onUserLogin(user) : onUserLogout());
-    } else if (retries > 0) {
-      setTimeout(() => initFirebase(retries - 1), 500);
-    } else {
-      // offline fallback
-      document.getElementById('login-screen').style.display = 'none';
-      document.querySelector('.topbar').style.display = 'flex';
-      document.querySelector('.main').style.display   = 'block';
-      populateYearFilter(); populateCfYearFilter();
-      updateClientsList(); updateServicesList();
-      renderDashboard();
-    }
-  }
-  initFirebase(10);
-});
+window.addEventListener('load', initApp);
 
 // ========== SIDE PANEL ==========
 function openPanel() {
@@ -1567,17 +1513,15 @@ function save() {
   localStorage.setItem('fin3_followups',  JSON.stringify(followups));
   localStorage.setItem('fin3_recurring',  JSON.stringify(recurring));
   localStorage.setItem('fin3_checksout',  JSON.stringify(checksOut));
-  // Firestore – async, non-blocking
-  if (currentUser) {
-    fbSave('payments',   payments);
-    fbSave('expenses',   expenses);
-    fbSave('clients',    clients);
-    fbSave('quotes',     quotes);
-    fbSave('activities', activities);
-    fbSave('followups',  followups);
-    fbSave('recurring',  recurring);
-    fbSave('checksout',  checksOut);
-  }
+  // Firestore REST – async, non-blocking
+  fbSave('payments',   payments);
+  fbSave('expenses',   expenses);
+  fbSave('clients',    clients);
+  fbSave('quotes',     quotes);
+  fbSave('activities', activities);
+  fbSave('followups',  followups);
+  fbSave('recurring',  recurring);
+  fbSave('checksout',  checksOut);
 }
 
 // ========== FILTERS ==========
